@@ -2,8 +2,11 @@ AndroidMainfest.xml:
 ====================
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.example.lenovo.nerd" >
-
+    package="com.example.nerd" >
+    <uses-sdk android:minSdkVersion="5" 
+        android:targetSdkVersion="19"/>
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    
     <application
         android:allowBackup="true"
         android:debuggable="true"
@@ -26,7 +29,11 @@ AndroidMainfest.xml:
 
 MainActivity.java:
 ==================
-package com.example.lenovo.nerd;
+package com.example.nerd;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
 
 import android.app.Activity;
 import android.content.Context;
@@ -35,16 +42,12 @@ import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.os.Bundle;
-import android.view.View;
-import android.view.animation.Animation;
-import android.view.animation.AnimationUtils;
-import android.widget.FrameLayout;
+import android.os.Environment;
+import android.util.Log;
 import android.widget.TextView;
 
-import com.example.lenovo.nerd.R;
+import com.example.nerd.R;
 
-import java.util.ArrayList;
-import java.util.Random;
 
 
 public class MainActivity extends Activity implements SensorEventListener {
@@ -53,7 +56,6 @@ public class MainActivity extends Activity implements SensorEventListener {
     private Sensor senAccelerometer;
     private long lastUpdate = 0;
     private float last_x, last_y, last_z;
-    private static final int SHAKE_THRESHOLD = 600;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -63,84 +65,50 @@ public class MainActivity extends Activity implements SensorEventListener {
         senSensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
         senAccelerometer = senSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
         senSensorManager.registerListener(this, senAccelerometer , SensorManager.SENSOR_DELAY_NORMAL);
+
+/* *********************AVD testing******************************** */
+//below six lines to be deleted as it is used only for testing in AVD
+        TextView text = (TextView)findViewById(R.id.value_x);
+        text.setText("00");
+        text = (TextView)findViewById(R.id.value_y);
+        text.setText("00");
+        text = (TextView)findViewById(R.id.value_z);
+        text.setText("00");
+        
+//below lines to be deleted as it is used to check write to external file
+        
+     // get the path to sdcard
+        File sdcard = Environment.getExternalStorageDirectory();
+        // to this path add a new directory path
+        File dir = new File(sdcard.getAbsolutePath() + "/your-dir-name/");
+        // create this directory if not already created
+        dir.mkdir();
+        // create the file in which we will write the contents
+        File file = new File(dir, "My-File-Name.txt");
+        try {
+            FileOutputStream os = new FileOutputStream(file);
+            String data = "This is the content of my file";
+			os.write(data.getBytes());
+	        os.close();
+		} catch (IOException e) {
+			Log.v("sTag", "Exception in write to external storage");
+			e.printStackTrace();
+		}
+/* *********************AVD testing******************************** */
     }
 
-    private void getRandomNumber() {
-        ArrayList numbersGenerated = new ArrayList();
-
-        for (int i = 0; i < 6; i++) {
-            Random randNumber = new Random();
-            int iNumber = randNumber.nextInt(48) + 1;
-
-            if(!numbersGenerated.contains(iNumber)) {
-                numbersGenerated.add(iNumber);
-            } else {
-                i--;
-            }
-        }
-
-        TextView text = (TextView)findViewById(R.id.number_1);
-        text.setText(""+numbersGenerated.get(0));
-
-        text = (TextView)findViewById(R.id.number_2);
-        text.setText(""+numbersGenerated.get(1));
-
-        text = (TextView)findViewById(R.id.number_3);
-        text.setText(""+numbersGenerated.get(2));
-
-        text = (TextView)findViewById(R.id.number_4);
-        text.setText(""+numbersGenerated.get(3));
-
-        text = (TextView)findViewById(R.id.number_5);
-        text.setText(""+numbersGenerated.get(4));
-
-        text = (TextView)findViewById(R.id.number_6);
-        text.setText(""+numbersGenerated.get(5));
-
-        FrameLayout ball1 = (FrameLayout) findViewById(R.id.ball_1);
-        ball1.setVisibility(View.INVISIBLE);
-
-        FrameLayout ball2 = (FrameLayout) findViewById(R.id.ball_2);
-        ball2.setVisibility(View.INVISIBLE);
-
-        FrameLayout ball3 = (FrameLayout) findViewById(R.id.ball_3);
-        ball3.setVisibility(View.INVISIBLE);
-
-        FrameLayout ball4 = (FrameLayout) findViewById(R.id.ball_4);
-        ball4.setVisibility(View.INVISIBLE);
-
-        FrameLayout ball5 = (FrameLayout) findViewById(R.id.ball_5);
-        ball5.setVisibility(View.INVISIBLE);
-
-        FrameLayout ball6 = (FrameLayout) findViewById(R.id.ball_6);
-        ball6.setVisibility(View.INVISIBLE);
-
-        Animation a = AnimationUtils.loadAnimation(this, R.anim.move_down_ball_first);
-        ball6.setVisibility(View.VISIBLE);
-        ball6.clearAnimation();
-        ball6.startAnimation(a);
-
-        ball5.setVisibility(View.VISIBLE);
-        ball5.clearAnimation();
-        ball5.startAnimation(a);
-
-        ball4.setVisibility(View.VISIBLE);
-        ball4.clearAnimation();
-        ball4.startAnimation(a);
-
-        ball3.setVisibility(View.VISIBLE);
-        ball3.clearAnimation();
-        ball3.startAnimation(a);
-
-        ball2.setVisibility(View.VISIBLE);
-        ball2.clearAnimation();
-        ball2.startAnimation(a);
-
-        ball1.setVisibility(View.VISIBLE);
-        ball1.clearAnimation();
-        ball1.startAnimation(a);
-    }
-
+    public static boolean canWriteOnExternalStorage() {
+    	   // get the state of your external storage
+    	   String state = Environment.getExternalStorageState();
+    	   if (Environment.MEDIA_MOUNTED.equals(state)) {
+    	    // if storage is mounted return true
+    	      Log.v("sTag" , "Yes can write to external storage.");
+    	      return true;
+    	   }
+    	   Log.v("sTag" , "NO cannot write to external storage.");
+    	   return false;
+    	}    
+    
     public void onSensorChanged(SensorEvent sensorEvent) {
         Sensor mySensor = sensorEvent.sensor;
 
@@ -157,9 +125,16 @@ public class MainActivity extends Activity implements SensorEventListener {
 
                 float speed = Math.abs(x + y + z - last_x - last_y - last_z)/ diffTime * 10000;
 
-                if (speed > SHAKE_THRESHOLD) {
-                    getRandomNumber();
-                }
+                //if (speed > SHAKE_THRESHOLD) {
+                    TextView text = (TextView)findViewById(R.id.value_x);
+                    text.setText("00"+x);
+
+                    text = (TextView)findViewById(R.id.value_y);
+                    text.setText("00"+y);
+
+                    text = (TextView)findViewById(R.id.value_z);
+                    text.setText("00"+z);                    
+                    //}
 
                 last_x = x;
                 last_y = y;
@@ -185,6 +160,7 @@ public class MainActivity extends Activity implements SensorEventListener {
 }
 
 
+
 menu_main.xml:
 ==============
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
@@ -201,123 +177,79 @@ activity_main.xml:
     android:orientation="vertical"
     android:layout_width="fill_parent"
     android:layout_height="fill_parent">
-    <LinearLayout
-        android:layout_height="wrap_content"
-        android:layout_width="fill_parent"
-        android:weightSum="6"
-        android:orientation="horizontal">
-        <FrameLayout
-            android:layout_height="wrap_content"
-            android:layout_width="wrap_content"
-            android:layout_margin="5dp"
-            android:layout_weight="2"
-            android:id="@+id/ball_1"
-            android:background="@drawable/blue">
-            <TextView
-                android:layout_width="fill_parent"
-                android:layout_height="fill_parent"
-                android:id="@+id/number_1"
-                android:gravity="center"
-                android:layout_gravity="center_vertical"
-                android:textColor="@android:color/white"/>
-        </FrameLayout>
-        <FrameLayout
-            android:layout_height="wrap_content"
-            android:layout_width="wrap_content"
-            android:layout_margin="5dp"
-            android:layout_weight="2"
-            android:id="@+id/ball_2"
-            android:background="@drawable/blue">
-            <TextView
-                android:layout_width="fill_parent"
-                android:layout_height="fill_parent"
-                android:id="@+id/number_2"
-                android:gravity="center"
-                android:layout_gravity="center_vertical"
-                android:textColor="@android:color/white"/>
-        </FrameLayout>
-        <FrameLayout
-            android:layout_height="wrap_content"
-            android:layout_width="wrap_content"
-            android:layout_margin="5dp"
-            android:layout_weight="2"
-            android:id="@+id/ball_3"
-            android:background="@drawable/blue">
-            <TextView
-                android:layout_width="fill_parent"
-                android:layout_height="fill_parent"
-                android:id="@+id/number_3"
-                android:gravity="center"
-                android:layout_gravity="center_vertical"
-                android:textColor="@android:color/white"/>
-        </FrameLayout>
-    </LinearLayout>
 
-    <LinearLayout
-        android:layout_height="wrap_content"
-        android:layout_width="fill_parent"
-        android:weightSum="6"
-        android:orientation="horizontal">
-        <FrameLayout
-            android:layout_height="wrap_content"
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+        <TextView
             android:layout_width="wrap_content"
-            android:layout_margin="5dp"
-            android:layout_weight="2"
-            android:id="@+id/ball_4"
-            android:background="@drawable/blue">
-            <TextView
-                android:layout_width="fill_parent"
-                android:layout_height="fill_parent"
-                android:id="@+id/number_4"
-                android:gravity="center"
-                android:layout_gravity="center_vertical"
-                android:textColor="@android:color/white"/>
-        </FrameLayout>
-        <FrameLayout
             android:layout_height="wrap_content"
-            android:layout_width="wrap_content"
-            android:layout_margin="5dp"
-            android:id="@+id/ball_5"
-            android:layout_weight="2"
-            android:background="@drawable/blue">
-            <TextView
-                android:layout_width="fill_parent"
-                android:layout_height="fill_parent"
-                android:id="@+id/number_5"
-                android:gravity="center"
-                android:layout_gravity="center_vertical"
-                android:textColor="@android:color/white"/>
-        </FrameLayout>
-        <FrameLayout
-            android:layout_height="wrap_content"
-            android:layout_width="wrap_content"
-            android:layout_margin="5dp"
-            android:id="@+id/ball_6"
-            android:layout_weight="2"
-            android:background="@drawable/blue">
-            <TextView
-                android:layout_width="fill_parent"
-                android:layout_height="fill_parent"
-                android:id="@+id/number_6"
-                android:gravity="center"
-                android:layout_gravity="center_vertical"
-                android:textColor="@android:color/white"/>
-        </FrameLayout>
-    </LinearLayout>
+            android:id="@+id/title_x"
+            android:layout_alignParentLeft="true"
+            android:textColor="@android:color/black"
+            android:text="@string/title_x"/>
 
+        <TextView
+            android:id="@+id/value_x"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_toRightOf="@+id/title_x"
+            android:paddingLeft="16dp"
+            android:text="0000"
+            android:textColor="@android:color/black" />
+    </RelativeLayout>
+        
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:id="@+id/title_y"
+            android:layout_alignParentLeft="true"
+            android:textColor="@android:color/black"
+            android:text="@string/title_y"/>
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_toRightOf="@+id/title_y"
+            android:paddingLeft="16dp"
+            android:id="@+id/value_y"
+            android:text="0000"
+            android:textColor="@android:color/black"/>
+    </RelativeLayout>
+        
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:id="@+id/title_z"
+            android:layout_alignParentLeft="true"
+            android:textColor="@android:color/black"
+            android:text="@string/title_z"/>
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:id="@+id/value_z"
+            android:layout_toRightOf="@+id/title_z"
+            android:paddingLeft="16dp"
+            android:text="0000"
+            android:textColor="@android:color/black"/>
+    </RelativeLayout>
+        
 </LinearLayout>
 
-anim/move_down_ball_first.xml:
-==============================
+strings.xml:
+===========
 <?xml version="1.0" encoding="utf-8"?>
-<set xmlns:android="http://schemas.android.com/apk/res/android"
-    android:fillAfter="true"
-    android:interpolator="@android:anim/bounce_interpolator">
+<resources>
 
-    <scale
-        android:duration="1500"
-        android:fromXScale="1.0"
-        android:fromYScale="-10.0"
-        android:toXScale="1.0"
-        android:toYScale="1.0" />
-</set>
+    <string name="app_name">NERD</string>
+    <string name="action_settings">Settings</string>
+    <string name="title_x">Change in X : </string>
+    <string name="title_y">Change in Y : </string>
+    <string name="title_z">Change in Z : </string>
+    
+</resources>
