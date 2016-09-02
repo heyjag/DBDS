@@ -2,14 +2,14 @@ AndroidMainfest.xml:
 ====================
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.example.nerd" >
-    <uses-sdk android:minSdkVersion="5" 
+    package="com.example.lenovo.nerd" >
+    <uses-sdk android:minSdkVersion="5"
         android:targetSdkVersion="19"/>
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
-    
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+
     <application
         android:allowBackup="true"
-        android:debuggable="true"
         android:icon="@drawable/ic_launcher"
         android:label="@string/app_name"
         android:theme="@style/AppTheme" >
@@ -29,11 +29,21 @@ AndroidMainfest.xml:
 
 MainActivity.java:
 ==================
-package com.example.nerd;
+package com.example.lenovo.nerd;
 
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+
+import android.location.Location;
+import com.google.android.gms.common.ConnectionResult;
+import com.google.android.gms.common.GooglePlayServicesUtil;
+import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.common.api.PendingResult;
+import com.google.android.gms.common.api.Status;
+import com.google.android.gms.location.LocationListener;
+import com.google.android.gms.location.LocationRequest;
+import com.google.android.gms.location.LocationServices;
 
 import android.app.Activity;
 import android.content.Context;
@@ -46,16 +56,25 @@ import android.os.Environment;
 import android.util.Log;
 import android.widget.TextView;
 
-import com.example.nerd.R;
+import com.example.lenovo.nerd.R;
 
 
-
-public class MainActivity extends Activity implements SensorEventListener {
+public class MainActivity extends Activity implements SensorEventListener,
+        LocationListener,
+        GoogleApiClient.ConnectionCallbacks,
+        GoogleApiClient.OnConnectionFailedListener{
     /** Called when the activity is first created. */
     private SensorManager senSensorManager;
     private Sensor senAccelerometer;
     private long lastUpdate = 0;
     private float last_x, last_y, last_z;
+    private FileOutputStream os;
+
+    private static final long INTERVAL = 1000 * 10;
+    private static final long FASTEST_INTERVAL = 1000 * 5;
+    LocationRequest mLocationRequest;
+    GoogleApiClient mGoogleApiClient;
+    Location mCurrentLocation;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -66,49 +85,107 @@ public class MainActivity extends Activity implements SensorEventListener {
         senAccelerometer = senSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
         senSensorManager.registerListener(this, senAccelerometer , SensorManager.SENSOR_DELAY_NORMAL);
 
-/* *********************AVD testing******************************** */
-//below six lines to be deleted as it is used only for testing in AVD
-        TextView text = (TextView)findViewById(R.id.value_x);
-        text.setText("00");
-        text = (TextView)findViewById(R.id.value_y);
-        text.setText("00");
-        text = (TextView)findViewById(R.id.value_z);
-        text.setText("00");
-        
-//below lines to be deleted as it is used to check write to external file
-        
-     // get the path to sdcard
+        // get the path to sdcard
         File sdcard = Environment.getExternalStorageDirectory();
         // to this path add a new directory path
-        File dir = new File(sdcard.getAbsolutePath() + "/your-dir-name/");
+        File dir = new File(sdcard.getAbsolutePath() + "/NERD_FILES/");
         // create this directory if not already created
         dir.mkdir();
         // create the file in which we will write the contents
-        File file = new File(dir, "My-File-Name.txt");
-        try {
-            FileOutputStream os = new FileOutputStream(file);
-            String data = "This is the content of my file";
-			os.write(data.getBytes());
-	        os.close();
-		} catch (IOException e) {
-			Log.v("sTag", "Exception in write to external storage");
-			e.printStackTrace();
-		}
-/* *********************AVD testing******************************** */
+        long curTime = System.currentTimeMillis();
+        File file = new File(dir, "File"+ curTime +".txt");
+
+        try
+        {
+            os = new FileOutputStream(file);
+        } catch (IOException e)
+        {
+            Log.v("sTag", "Exception in write to external storage");
+            e.printStackTrace();
+        }
+
+        if (!isGooglePlayServicesAvailable()) {
+            finish();
+        }
+        createLocationRequest();
+        mGoogleApiClient = new GoogleApiClient.Builder(this)
+                .addApi(LocationServices.API)
+                .addConnectionCallbacks(this)
+                .addOnConnectionFailedListener(this)
+                .build();
+    }
+
+
+    @Override
+    public void onConnected(Bundle bundle) {
+        Log.d("sTAG", "onConnected - isConnected ...............: " + mGoogleApiClient.isConnected());
+        startLocationUpdates();
+    }
+
+    protected void startLocationUpdates() {
+        PendingResult<Status> pendingResult = LocationServices.FusedLocationApi.requestLocationUpdates(
+                mGoogleApiClient, mLocationRequest, this);
+    }
+
+    @Override
+    public void onConnectionSuspended(int i) {
+
+    }
+
+    @Override
+    public void onConnectionFailed(ConnectionResult connectionResult) {
+        Log.d("sTAG", "Connection failed: " + connectionResult.toString());
+    }
+
+    @Override
+    public void onLocationChanged(Location location) {
+        Log.d("sTAG", "Firing onLocationChanged..............................................");
+        mCurrentLocation = location;
+    }
+
+    public void onDestroy()
+    {
+        try
+        {
+            os.close();
+            Log.v("sTag", "File Closed");
+        } catch (IOException e)
+        {
+            Log.v("sTag", "File not Closed");
+            e.printStackTrace();
+        }
+        super.onDestroy();
+    }
+
+    protected void createLocationRequest() {
+        mLocationRequest = new LocationRequest();
+        mLocationRequest.setInterval(INTERVAL);
+        mLocationRequest.setFastestInterval(FASTEST_INTERVAL);
+        mLocationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
+    }
+
+    private boolean isGooglePlayServicesAvailable() {
+        int status = GooglePlayServicesUtil.isGooglePlayServicesAvailable(this);
+        if (ConnectionResult.SUCCESS == status) {
+            return true;
+        } else {
+            GooglePlayServicesUtil.getErrorDialog(status, this, 0).show();
+            return false;
+        }
     }
 
     public static boolean canWriteOnExternalStorage() {
-    	   // get the state of your external storage
-    	   String state = Environment.getExternalStorageState();
-    	   if (Environment.MEDIA_MOUNTED.equals(state)) {
-    	    // if storage is mounted return true
-    	      Log.v("sTag" , "Yes can write to external storage.");
-    	      return true;
-    	   }
-    	   Log.v("sTag" , "NO cannot write to external storage.");
-    	   return false;
-    	}    
-    
+        // get the state of your external storage
+        String state = Environment.getExternalStorageState();
+        if (Environment.MEDIA_MOUNTED.equals(state)) {
+            // if storage is mounted return true
+            Log.v("sTag" , "Yes can write to external storage.");
+            return true;
+        }
+        Log.v("sTag" , "NO cannot write to external storage.");
+        return false;
+    }
+
     public void onSensorChanged(SensorEvent sensorEvent) {
         Sensor mySensor = sensorEvent.sensor;
 
@@ -119,22 +196,34 @@ public class MainActivity extends Activity implements SensorEventListener {
 
             long curTime = System.currentTimeMillis();
 
-            if ((curTime - lastUpdate) > 100) {
+            if ((curTime - lastUpdate) > 1000) {
                 long diffTime = (curTime - lastUpdate);
                 lastUpdate = curTime;
 
                 float speed = Math.abs(x + y + z - last_x - last_y - last_z)/ diffTime * 10000;
 
                 //if (speed > SHAKE_THRESHOLD) {
-                    TextView text = (TextView)findViewById(R.id.value_x);
-                    text.setText("00"+x);
+                TextView text = (TextView)findViewById(R.id.value_x);
+                text.setText("xx "+x);
 
-                    text = (TextView)findViewById(R.id.value_y);
-                    text.setText("00"+y);
+                text = (TextView)findViewById(R.id.value_y);
+                text.setText("yy "+y);
 
-                    text = (TextView)findViewById(R.id.value_z);
-                    text.setText("00"+z);                    
-                    //}
+                text = (TextView)findViewById(R.id.value_z);
+                text.setText("zz "+z);
+                //}
+
+                text = (TextView)findViewById(R.id.value_gps);
+                text.setText("gps" + mCurrentLocation);
+
+                String data = "" + curTime + ", " + x + ", " + y + ", " + z + "\n";
+                try
+                {
+                    os.write(data.getBytes());
+                } catch (IOException e)
+                {
+                    e.printStackTrace();
+                }
 
                 last_x = x;
                 last_y = y;
@@ -174,9 +263,119 @@ activity_main.xml:
 ==================
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:mstb="http://schemas.android.com/apk/res-auto"
     android:orientation="vertical"
     android:layout_width="fill_parent"
     android:layout_height="fill_parent">
+
+    <View
+        android:layout_width="fill_parent"
+        android:layout_height="2dp"
+        android:layout_alignParentRight="true"
+        android:layout_marginTop="20dp"
+        android:background="#ff9703" />
+
+    <Switch
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingLeft="16dp"
+        android:text="Driving"
+        android:textOn="Rash"
+        android:textOff="Normal"
+        android:showText="true"
+        android:id="@+id/drivingSwitch"/>
+    <View
+        android:layout_width="fill_parent"
+        android:layout_height="2dp"
+        android:layout_alignParentRight="true"
+        android:layout_marginTop="20dp"
+        android:background="#ff9703" />
+
+    <Switch
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingLeft="16dp"
+        android:text="Sudden Braking"
+        android:textOn="Yes"
+        android:textOff="No"
+        android:showText="true"
+        android:id="@+id/brakingSwitch"/>
+    <View
+        android:layout_width="fill_parent"
+        android:layout_height="2dp"
+        android:layout_alignParentRight="true"
+        android:layout_marginTop="20dp"
+        android:background="#ff9703" />
+
+    <Switch
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingLeft="16dp"
+        android:text="Sudden Acceleration"
+        android:textOn="Yes"
+        android:textOff="No"
+        android:showText="true"
+        android:id="@+id/accelSwitch"/>
+    <View
+        android:layout_width="fill_parent"
+        android:layout_height="2dp"
+        android:layout_alignParentRight="true"
+        android:layout_marginTop="20dp"
+        android:background="#ff9703" />
+
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:id="@+id/title_turn"
+            android:paddingLeft="16dp"
+            android:text="Turn"
+            android:gravity="bottom"
+            android:textColor="@android:color/black"/>
+
+        <RadioGroup
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content"
+            android:layout_toRightOf="@+id/title_turn"
+            android:orientation="horizontal">
+            <RadioButton android:id="@+id/radio_leftTurn"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/leftTurn"/>
+            <RadioButton android:id="@+id/radio_straight"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/Straight"/>
+            <RadioButton android:id="@+id/radio_rightTurn"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/rightTurn"/>
+        </RadioGroup>
+    </RelativeLayout>
+
+    <View
+        android:layout_width="fill_parent"
+        android:layout_height="2dp"
+        android:layout_alignParentRight="true"
+        android:layout_marginTop="20dp"
+        android:background="#ff9703" />
+
+    <Switch
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Road Condition"
+        android:textOn="Bad"
+        android:textOff="Good"
+        android:showText="true"
+        android:id="@+id/roadSwitch"/>
+    <View
+        android:layout_width="fill_parent"
+        android:layout_height="2dp"
+        android:layout_alignParentRight="true"
+        android:layout_marginTop="20dp"
+        android:background="#ff9703" />
 
     <RelativeLayout
         android:layout_width="match_parent"
@@ -198,7 +397,7 @@ activity_main.xml:
             android:text="0000"
             android:textColor="@android:color/black" />
     </RelativeLayout>
-        
+
     <RelativeLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content">
@@ -218,7 +417,7 @@ activity_main.xml:
             android:text="0000"
             android:textColor="@android:color/black"/>
     </RelativeLayout>
-        
+
     <RelativeLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content">
@@ -238,9 +437,36 @@ activity_main.xml:
             android:text="0000"
             android:textColor="@android:color/black"/>
     </RelativeLayout>
-        
-</LinearLayout>
 
+    <View
+        android:layout_width="fill_parent"
+        android:layout_height="2dp"
+        android:layout_alignParentRight="true"
+        android:layout_marginTop="20dp"
+        android:background="#ff9703" />
+
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:id="@+id/title_gps"
+            android:layout_alignParentLeft="true"
+            android:textColor="@android:color/black"
+            android:text="@string/title_gps"/>
+
+        <TextView
+            android:id="@+id/value_gps"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_toRightOf="@+id/title_gps"
+            android:paddingLeft="16dp"
+            android:text="0000"
+            android:textColor="@android:color/black" />
+    </RelativeLayout>
+
+</LinearLayout>
 strings.xml:
 ===========
 <?xml version="1.0" encoding="utf-8"?>
@@ -251,5 +477,9 @@ strings.xml:
     <string name="title_x">Change in X : </string>
     <string name="title_y">Change in Y : </string>
     <string name="title_z">Change in Z : </string>
-    
+    <string name="title_gps">GPS co-ord : </string>
+    <string name="leftTurn">Left</string>
+    <string name="Straight">Straight</string>
+    <string name="rightTurn">Right</string>
+
 </resources>
