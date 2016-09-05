@@ -34,35 +34,29 @@ package com.example.lenovo.nerd;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-
-import android.location.Location;
-import com.google.android.gms.common.ConnectionResult;
-import com.google.android.gms.common.GooglePlayServicesUtil;
-import com.google.android.gms.common.api.GoogleApiClient;
-import com.google.android.gms.common.api.PendingResult;
-import com.google.android.gms.common.api.Status;
-import com.google.android.gms.location.LocationListener;
-import com.google.android.gms.location.LocationRequest;
-import com.google.android.gms.location.LocationServices;
+import java.util.Locale;
 
 import android.app.Activity;
 import android.content.Context;
+import android.content.Intent;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
+import android.location.Criteria;
+import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
 import android.os.Bundle;
 import android.os.Environment;
+import android.provider.Settings;
 import android.util.Log;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.example.lenovo.nerd.R;
 
-
-public class MainActivity extends Activity implements SensorEventListener,
-        LocationListener,
-        GoogleApiClient.ConnectionCallbacks,
-        GoogleApiClient.OnConnectionFailedListener{
+public class MainActivity extends Activity implements SensorEventListener, LocationListener {
     /** Called when the activity is first created. */
     private SensorManager senSensorManager;
     private Sensor senAccelerometer;
@@ -70,11 +64,13 @@ public class MainActivity extends Activity implements SensorEventListener,
     private float last_x, last_y, last_z;
     private FileOutputStream os;
 
-    private static final long INTERVAL = 1000 * 10;
-    private static final long FASTEST_INTERVAL = 1000 * 5;
-    LocationRequest mLocationRequest;
-    GoogleApiClient mGoogleApiClient;
-    Location mCurrentLocation;
+    private final int BESTAVAILABLEPROVIDERCODE = 1;
+    private final int BESTPROVIDERCODE = 2;
+    LocationManager locationManager;
+    Location loc;
+    String bestProvider;
+    String bestAvailableProvider;
+    String provider;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -104,43 +100,79 @@ public class MainActivity extends Activity implements SensorEventListener,
             e.printStackTrace();
         }
 
-        if (!isGooglePlayServicesAvailable()) {
-            finish();
+        // set a Criteria specifying things you want from a particular Location Service
+        Criteria criteria = new Criteria();
+        criteria.setSpeedRequired(false);
+        criteria.setAccuracy(Criteria.ACCURACY_FINE);
+        criteria.setCostAllowed(true);
+        criteria.setBearingAccuracy(Criteria.ACCURACY_HIGH);
+        criteria.setAltitudeRequired(false);
+
+        locationManager = (LocationManager) this.getSystemService(Context.LOCATION_SERVICE);
+        // finding best provider without fulfilling the criteria
+        bestProvider = locationManager.getBestProvider(criteria, false);
+        // finding best provider which fulfills the criteria
+        bestAvailableProvider = locationManager.getBestProvider(criteria, true);
+        getProvider();
+        requestLocation(provider);
+    }
+
+    public void requestLocation(String usedLocationService) {
+        long updateTime = 0;
+        float updateDistance = 0;
+        // finding the current location
+        locationManager.requestLocationUpdates(usedLocationService, updateTime, updateDistance, this);
+    }
+
+    public void getProvider()
+    {
+        //String toastMessage = null;
+        if (bestProvider == null) {
+            //toastMessage = "NO best Provider Found";
+        } else if (bestAvailableProvider != null && bestAvailableProvider.equals(bestAvailableProvider)) {
+            boolean enabled = locationManager.isProviderEnabled(bestAvailableProvider);
+            if (!enabled) {
+                Toast.makeText(this, " Please enable " + bestAvailableProvider + " to find your location", Toast.LENGTH_LONG).show();
+                Intent mainIntent = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
+                startActivityForResult(mainIntent, BESTAVAILABLEPROVIDERCODE);
+            } else {
+                provider = bestAvailableProvider;
+            }
+            //toastMessage = bestAvailableProvider + " used for getting your current location";
+        } else {
+            boolean enabled = locationManager.isProviderEnabled(bestProvider);
+            if (!enabled) {
+                Toast.makeText(this, " Please enable " + bestProvider + " to find your location", Toast.LENGTH_LONG).show();
+                Intent mainIntent = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
+                startActivityForResult(mainIntent, BESTPROVIDERCODE);
+            } else {
+                provider = bestProvider;
+            }
+            //toastMessage = bestProvider + " is used to get your current location";
+
         }
-        createLocationRequest();
-        mGoogleApiClient = new GoogleApiClient.Builder(this)
-                .addApi(LocationServices.API)
-                .addConnectionCallbacks(this)
-                .addOnConnectionFailedListener(this)
-                .build();
-    }
-
-
-    @Override
-    public void onConnected(Bundle bundle) {
-        Log.d("sTAG", "onConnected - isConnected ...............: " + mGoogleApiClient.isConnected());
-        startLocationUpdates();
-    }
-
-    protected void startLocationUpdates() {
-        PendingResult<Status> pendingResult = LocationServices.FusedLocationApi.requestLocationUpdates(
-                mGoogleApiClient, mLocationRequest, this);
-    }
-
-    @Override
-    public void onConnectionSuspended(int i) {
-
-    }
-
-    @Override
-    public void onConnectionFailed(ConnectionResult connectionResult) {
-        Log.d("sTAG", "Connection failed: " + connectionResult.toString());
+        //Toast.makeText(this, toastMessage, Toast.LENGTH_LONG).show();
     }
 
     @Override
     public void onLocationChanged(Location location) {
-        Log.d("sTAG", "Firing onLocationChanged..............................................");
-        mCurrentLocation = location;
+        loc=location;
+        Log.d("Location Found", loc.getLatitude() + " " + loc.getLongitude());
+    }
+
+    @Override
+    public void onStatusChanged(String s, int i, Bundle bundle) {
+        //To change body of implemented methods use File | Settings | File Templates.
+    }
+
+    @Override
+    public void onProviderEnabled(String s) {
+        //To change body of implemented methods use File | Settings | File Templates.
+    }
+
+    @Override
+    public void onProviderDisabled(String s) {
+        //To change body of implemented methods use File | Settings | File Templates.
     }
 
     public void onDestroy()
@@ -157,23 +189,6 @@ public class MainActivity extends Activity implements SensorEventListener,
         super.onDestroy();
     }
 
-    protected void createLocationRequest() {
-        mLocationRequest = new LocationRequest();
-        mLocationRequest.setInterval(INTERVAL);
-        mLocationRequest.setFastestInterval(FASTEST_INTERVAL);
-        mLocationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
-    }
-
-    private boolean isGooglePlayServicesAvailable() {
-        int status = GooglePlayServicesUtil.isGooglePlayServicesAvailable(this);
-        if (ConnectionResult.SUCCESS == status) {
-            return true;
-        } else {
-            GooglePlayServicesUtil.getErrorDialog(status, this, 0).show();
-            return false;
-        }
-    }
-
     public static boolean canWriteOnExternalStorage() {
         // get the state of your external storage
         String state = Environment.getExternalStorageState();
@@ -188,6 +203,7 @@ public class MainActivity extends Activity implements SensorEventListener,
 
     public void onSensorChanged(SensorEvent sensorEvent) {
         Sensor mySensor = sensorEvent.sensor;
+        double lat = 0, lon = 0;
 
         if (mySensor.getType() == Sensor.TYPE_ACCELEROMETER) {
             float x = sensorEvent.values[0];
@@ -197,12 +213,8 @@ public class MainActivity extends Activity implements SensorEventListener,
             long curTime = System.currentTimeMillis();
 
             if ((curTime - lastUpdate) > 1000) {
-                long diffTime = (curTime - lastUpdate);
                 lastUpdate = curTime;
 
-                float speed = Math.abs(x + y + z - last_x - last_y - last_z)/ diffTime * 10000;
-
-                //if (speed > SHAKE_THRESHOLD) {
                 TextView text = (TextView)findViewById(R.id.value_x);
                 text.setText("xx "+x);
 
@@ -211,12 +223,28 @@ public class MainActivity extends Activity implements SensorEventListener,
 
                 text = (TextView)findViewById(R.id.value_z);
                 text.setText("zz "+z);
-                //}
+
+                loc = locationManager.getLastKnownLocation(provider);
 
                 text = (TextView)findViewById(R.id.value_gps);
-                text.setText("gps" + mCurrentLocation);
+                System.out.println(loc);
+                if(loc!=null)
+                {
+                    lat=loc.getLatitude();
+                    lon=loc.getLongitude();
+                    text.setText("lat = " + lat + ", lon = " + lon);
+                }
+                else
+                {
+                    lat=0;
+                    lon=0;
+                    text.setText("gpsnull");
+                    requestLocation(provider);
+                }
 
-                String data = "" + curTime + ", " + x + ", " + y + ", " + z + "\n";
+
+                String data = "" + curTime + ", " + x + ", " + y + ", " + z + ", "
+                              + lat + ", " + lon + "\n";
                 try
                 {
                     os.write(data.getBytes());
@@ -247,7 +275,6 @@ public class MainActivity extends Activity implements SensorEventListener,
         senSensorManager.registerListener(this, senAccelerometer, SensorManager.SENSOR_DELAY_NORMAL);
     }
 }
-
 
 
 menu_main.xml:
@@ -467,6 +494,8 @@ activity_main.xml:
     </RelativeLayout>
 
 </LinearLayout>
+
+
 strings.xml:
 ===========
 <?xml version="1.0" encoding="utf-8"?>
